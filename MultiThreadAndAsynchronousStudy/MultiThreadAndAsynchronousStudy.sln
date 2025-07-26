@@ -1,0 +1,61 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.14.36310.24
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BasicThreadSyntax", "BasicThreadSyntax\BasicThreadSyntax.csproj", "{E6EC297E-A26D-4BB5-907D-E4E639AD6FCC}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DivideAndConquer", "DivideAndConquer\DivideAndConquer.csproj", "{6FAC5381-D41F-469B-A461-3C6A4769590B}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OffloadingLongRunningTask", "OffloadingLongRunningTask\OffloadingLongRunningTask.csproj", "{A00C13D9-E223-45E6-B6C4-9F58E5F639EC}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Assignment1_SIM_WebServer", "Assignment1_SIM_WebServer\Assignment1_SIM_WebServer.csproj", "{E30B25F9-5FB6-4749-924E-4C24CD30EF68}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ThreadsSynchronizationOverview", "ThreadsSynchronizationOverview\ThreadsSynchronizationOverview.csproj", "{64A2F43B-5906-4D74-A180-D7F87BD89352}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ThreadSynchronizaitonPractice_Lock", "ThreadSynchronizaitonPractice_Lock\ThreadSynchronizaitonPractice_Lock.csproj", "{02312CCF-D1BD-4D59-A2FE-186ECCC1A137}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FlightSeatBookingSim", "FlightSeatBookingSim\FlightSeatBookingSim.csproj", "{2BD8B9E8-28B7-41EB-911C-E4F05FEDCA43}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{E6EC297E-A26D-4BB5-907D-E4E639AD6FCC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E6EC297E-A26D-4BB5-907D-E4E639AD6FCC}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E6EC297E-A26D-4BB5-907D-E4E639AD6FCC}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E6EC297E-A26D-4BB5-907D-E4E639AD6FCC}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6FAC5381-D41F-469B-A461-3C6A4769590B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6FAC5381-D41F-469B-A461-3C6A4769590B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6FAC5381-D41F-469B-A461-3C6A4769590B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6FAC5381-D41F-469B-A461-3C6A4769590B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A00C13D9-E223-45E6-B6C4-9F58E5F639EC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A00C13D9-E223-45E6-B6C4-9F58E5F639EC}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A00C13D9-E223-45E6-B6C4-9F58E5F639EC}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A00C13D9-E223-45E6-B6C4-9F58E5F639EC}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E30B25F9-5FB6-4749-924E-4C24CD30EF68}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E30B25F9-5FB6-4749-924E-4C24CD30EF68}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E30B25F9-5FB6-4749-924E-4C24CD30EF68}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E30B25F9-5FB6-4749-924E-4C24CD30EF68}.Release|Any CPU.Build.0 = Release|Any CPU
+		{64A2F43B-5906-4D74-A180-D7F87BD89352}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{64A2F43B-5906-4D74-A180-D7F87BD89352}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{64A2F43B-5906-4D74-A180-D7F87BD89352}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{64A2F43B-5906-4D74-A180-D7F87BD89352}.Release|Any CPU.Build.0 = Release|Any CPU
+		{02312CCF-D1BD-4D59-A2FE-186ECCC1A137}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{02312CCF-D1BD-4D59-A2FE-186ECCC1A137}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{02312CCF-D1BD-4D59-A2FE-186ECCC1A137}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{02312CCF-D1BD-4D59-A2FE-186ECCC1A137}.Release|Any CPU.Build.0 = Release|Any CPU
+		{2BD8B9E8-28B7-41EB-911C-E4F05FEDCA43}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2BD8B9E8-28B7-41EB-911C-E4F05FEDCA43}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2BD8B9E8-28B7-41EB-911C-E4F05FEDCA43}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2BD8B9E8-28B7-41EB-911C-E4F05FEDCA43}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {158F0198-FB52-4342-AA01-7E049DA92875}
+	EndGlobalSection
+EndGlobal
