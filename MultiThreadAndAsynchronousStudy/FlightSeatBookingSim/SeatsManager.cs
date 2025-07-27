@@ -10,7 +10,7 @@ namespace FlightSeatBookingSim
         readonly object _lock = new object();
 
         readonly List<int> seatIDs = null;
-        private bool isInitialized=false;
+        private bool isInitialized = false;
 
         public SeatsManager()
         {
@@ -23,7 +23,7 @@ namespace FlightSeatBookingSim
 
             lock (_lock)
             {
-                if(isInitialized) return;
+                if (isInitialized) return;
 
                 for (int i = 0; i < 5; i++)
                 {
@@ -41,11 +41,7 @@ namespace FlightSeatBookingSim
             foreach (int i in seatIDs)
             {
 
-                if (!seatLocks.TryGetValue(i, out object? seatLock))
-                {
-                    seatLock = new object();
-                    seatLocks[i] = seatLock;
-                }
+                object seatLock = seatLocks[i];
 
                 lock (seatLock)
                 {
@@ -66,19 +62,16 @@ namespace FlightSeatBookingSim
         }
 
 
-        public void CancelSeat(int seatID)
+        public bool CancelSeat(int seatID)
         {
             if (!Seats.ContainsKey(seatID))
             {
                 Console.WriteLine($"Invalid Seat ID : {seatID} !");
-                return;
+                return false;
             }
 
-            if (!seatLocks.TryGetValue(seatID, out object? seatLock))
-            {
-                seatLock = new object();
-                seatLocks[seatID] = seatLock;
-            }
+            object seatLock = seatLocks[seatID];
+
 
             lock (seatLock)
             {
@@ -91,6 +84,24 @@ namespace FlightSeatBookingSim
                 {
                     Console.WriteLine("you don't have a booked Seat");
                 }
+            }
+            return true;
+        }
+
+
+        public void OnBookingEventHandler(Passenger passenger)
+        {
+           
+                passenger.SeatID = BookSeat();
+            
+        }
+
+
+        public void OnCancelEventHandler(Passenger passenger)
+        {
+            if (CancelSeat(passenger.SeatID))
+            {
+                passenger.SeatID = -1;
             }
         }
     }
