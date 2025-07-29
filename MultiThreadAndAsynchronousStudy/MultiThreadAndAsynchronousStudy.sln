@@ -19,6 +19,12 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FlightSeatBookingSim", "Fli
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MutexBasicPractice", "MutexBasicPractice\MutexBasicPractice.csproj", "{DC594C4F-19E0-43A5-BD15-367A17F682C9}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ReaderAndWriterLockOverview", "ReaderAndWriterLockOverview\ReaderAndWriterLockOverview.csproj", "{CCF601A6-A02B-443C-B5F7-A78FFFE20FE8}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AutoResetEventOverview", "AutoResetEventOverview\AutoResetEventOverview.csproj", "{13505630-0E07-4CB9-A9A5-0E32AAE5CB4B}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ManualResetEventOverview", "ManualResetEventOverview\ManualResetEventOverview.csproj", "{2CBE712F-6B86-4D58-AAB5-472D419B296F}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -57,6 +63,18 @@ Global
 		{DC594C4F-19E0-43A5-BD15-367A17F682C9}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{DC594C4F-19E0-43A5-BD15-367A17F682C9}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{DC594C4F-19E0-43A5-BD15-367A17F682C9}.Release|Any CPU.Build.0 = Release|Any CPU
+		{CCF601A6-A02B-443C-B5F7-A78FFFE20FE8}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CCF601A6-A02B-443C-B5F7-A78FFFE20FE8}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CCF601A6-A02B-443C-B5F7-A78FFFE20FE8}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CCF601A6-A02B-443C-B5F7-A78FFFE20FE8}.Release|Any CPU.Build.0 = Release|Any CPU
+		{13505630-0E07-4CB9-A9A5-0E32AAE5CB4B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{13505630-0E07-4CB9-A9A5-0E32AAE5CB4B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{13505630-0E07-4CB9-A9A5-0E32AAE5CB4B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{13505630-0E07-4CB9-A9A5-0E32AAE5CB4B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{2CBE712F-6B86-4D58-AAB5-472D419B296F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2CBE712F-6B86-4D58-AAB5-472D419B296F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2CBE712F-6B86-4D58-AAB5-472D419B296F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2CBE712F-6B86-4D58-AAB5-472D419B296F}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

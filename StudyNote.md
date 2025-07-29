@@ -147,3 +147,177 @@ CPU 实际调度的是 线程的上下文（CPU 寄存器+程序计数器等）�
         }
     }
 ```
+
+### ReaderWriterLockSlim - 读写锁
+专门用于多线程应用程序共同访问(**仅读**)共享资源。
+
+与`Lock Monitor Mutex`不同， `ReaderWriterLockSlim` 读写锁不是 *Exclusive Lock*。当通过它获取 `Reader 权限`时，它允许其他线程获取读取shared resource的权限，同时不允许任何线程进行`写入`；当通过它获取 `Writer 权限`时，就编程常规的 *Exclusive Lock*效果，只能当前线程写入，其他线程不可读，也不可写。
+
+```C#
+ static void Main(string[] args)
+ {
+     Dictionary<int, string> sharedDic = new Dictionary<int, string>();
+
+     ReaderWriterLockSlim readerWriterLockSlim = new ReaderWriterLockSlim();
+
+     ///保守风格,代码会应用在不确定的环境比如这时Library 代码
+     /// 使用一个bool 变量作为确认锁获取成功的标记
+     /// 将EnterXXXLock()写在try里
+     /// 菜鸟阶段就用这种风格
+     void AddData(int id, string value)
+     {
+
+         bool lockAcquired = false; // 防止ReaderWriterLock在获取权限前发生异常
+
+         try
+         {
+             readerWriterLockSlim.EnterWriteLock();
+             lockAcquired = true; // 确认已经获取了Lock, 后续退出锁可以顺利执行
+             sharedDic[id] = value;
+         }
+         finally
+         {
+             if (lockAcquired) // 防止没有获取权限还执行退出Lock的代码
+             {
+                 readerWriterLockSlim.ExitWriteLock();
+             }
+
+         }
+     }
+
+     string? GetData(int id)
+     {
+         bool lockAcquired = false; // 防止ReaderWriterLock在获取权限前发生异常
+
+         try
+         {
+             readerWriterLockSlim.EnterReadLock();
+             lockAcquired = true;    // 确认已经获取了Lock, 后续退出锁可以顺利执行
+             return sharedDic.TryGetValue(id, out string value) ? value : null;
+         }
+         finally
+         {
+             if (lockAcquired) // 防止没有获取权限还执行退出Lock的代码
+             {
+                 readerWriterLockSlim.ExitReadLock();
+             }
+         }
+     }
+
+     ///这个风格是常规推荐风格,在自己知道获取锁不会失败的情况下
+     ///高手阶段之后用这种风格
+     void CommonStyle()
+     {
+         // 如果不确定可以在外面包一层 if 判断,确认各种权限都没有被占用
+         if (!readerWriterLockSlim.IsWriteLockHeld && !readerWriterLockSlim.IsReadLockHeld)
+         {
+             readerWriterLockSlim.EnterWriteLock(); // 放心进锁
+             try
+             {
+                 // 临界区
+             }
+             finally
+             {
+                 readerWriterLockSlim.ExitWriteLock();
+             }
+         }
+     }
+ }
+```
+### Semaphore And SemaphoreSlim - 信号量
+这是一种通过限制 `资源/代码` 访问数量的线程同步技术。它做的是**通过记数的形式限制一定数量的线程来访问被控制的代码或者资源片段。**
+
+**重要的是：**
+1. 它 ***不保护 `Critical Section`*** ！！！所以要使用Semaphore相关技术要注意自己去使用其他 *保护 Critical Section* 的技术对共享资源进行锁定。
+
+2. 它可以在其他线程或进程中释放。不受 Thread Affinity限制。
+
+
+`Semaphore` 是可以跨进程的版本，与`Mutex`一样构造函数中包含一个 *可命名* 的版本，并用传入的参数名称来获得全局访问。
+
+`SemaphoreSlim` 是进程内的跨线程版本，不可跨进程。
+
+
+```C#
+
+    // 或 using   SemaphoreSlim ssm = new SemaphoreSlim(initialCount:yourNum, maxCount:yourNum);
+    // 取决于代码风格和上下文状态
+
+    // 构造函数中声明初始的可用信号数量，和最大信号数量。如果二者一致就是固定数量的信号量
+    SemaphoreSlim ssm = new SemaphoreSlim(initialCount:yourNum, maxCount:yourNum); 
+
+
+    ssm.Wait(); // 获取到权限后可用信号量 减一， 当可用信号量为0时其他线程只能等待
+    try
+    {
+        // 被控制的代码体
+    }
+    finally
+    {
+        ssm.Release()； // 释放信号源，每释放一个信号量恢复1个
+    }
+```
+
+### AutoResetEvent - 1对1信号控制器
+`AutoResetEvent` 也是一个信号控制性线程同步技术。
+信号是一个2进制信号，只有`on - true` 和 `off - false`。 `当 `通行信号` 发出时 (由调用实例方法 `.Set()` 发出)，等待的权限的线程可获得 `通行权限`进入相应代码段：
+1. ***一次只能由一个等待线程获取权限***;
+2. ***通行信号发出后会立刻切换回 false 状态。无论是否有线程等待，通行信号的效能都不累计***
+3. 与`Semaphore`一样，都不保护`Critical Section`,只起到`阻塞和协调权限`作用
+4. 通常使用是，会有一个或若干个线程排队`.WaitOne()`,另一个线程`.Set()`
+
+基础语法：
+```c#
+    AutoResetEvent are= new AutoResetEvent(false)； // false代表一开始就是阻拦状态, true是打开通行信号。大多数情况都会采用false
+
+    are.WaitOne(); // 排队等待权限
+    // code 获取权限开始执行代码
+
+    are.Set(); // 确认开启通行信号
+```
+代码示例：
+```C#
+        internal class Program
+    {
+        static void Main(string[] args)
+        {
+            AutoResetEvent are = new AutoResetEvent(false); // 设置初始状态为false
+
+            Console.WriteLine("Farmer is making food....");
+
+            for (int i = 0; i < 5; i++) {
+
+                Thread pig = new Thread(() => PigFeed(are));
+                pig.Name = $"Pig {i}";
+                pig.Start();
+            }
+
+            while (true)
+            {
+                string input = Console.ReadLine()??"";
+                if (input =="a")
+                {
+                    Console.WriteLine("Food in the bowl");
+                    are.Set();
+                }
+            }
+
+
+        }
+        
+       static void PigFeed(AutoResetEvent are)
+        {
+            Console.WriteLine($"Pig {Thread.CurrentThread.Name} is waiting food...");
+
+            are.WaitOne();
+
+            Console.WriteLine($"{Thread.CurrentThread.Name} is Enjoying its food..., it's happy");
+
+            Random random = new Random();
+
+            Thread.Sleep( 1000 * random.Next(2,7));
+            Console.WriteLine($"{Thread.CurrentThread.Name} finished its food,It's waiting again...");
+        }
+
+    }
+```
