@@ -24,8 +24,74 @@ CPU 实际调度的是 线程的上下文（CPU 寄存器+程序计数器等）�
 2. 一个 CPU 核心在某个时间点只执行一个线程的代码（超线程技术除外）；
 3.多核 CPU 可以同时执行多个线程（物理并行）；
 
+### Thread states
+线程是有状态的。
+可以通过调用实例属性查看 `.ThreadState`。
+
+一般都是从 `Unstarted`开始,直到 `Stopped`结束。
+具体定义可以参看 https://learn.microsoft.com/en-us/dotnet/api/system.threading.threadstate?view=net-8.0
+每个`.Net`版本可能会有不同，注意选择对应版本。
+
+***根据官方建议，ThreadState只适合用来Debug，不要用它来做涉及线程同步的操作***
+
+### Thread Safty
+是指一个`Function`、`Class`或者`Data structure`可以在被多个线程同时使用或访问或修改的前提下，不会造成任何 **Race Condition、不符合期待的行为、或者数据污染**。一般来讲，具有这样性质的代码段的内部都已经使用了类似线程锁的机制。
+
+### ThreadPool
+线程池。 和之前学的对象池一个概念，就是将线程缓存起来的集合。
+但是C#中的线程池是由 *.Net*的*CLR*为应用程序创建的。开发者可以直接用：
+最小线程数：ThreadPool.GetMinThreads() (默认通常为处理器核心数)
+最大线程数：ThreadPool.GetMaxThreads() (默认约 32767)
+
+但是线程池是由.Net管理的，不能销毁也不能改名。如果需要对线程生命周期控制比较高的任务还是自己new Thread
+
+`Task`的底层就是线程池。 线程池适合处理IO密集型任务、短平快的任务或CPU密集型的任务。
+**长时间阻塞操作不要用线程池！**
+如何使用线程池
+```C#
+        ThreadPool.QueueUserWorkItem(AA);
+        void AA(object? i) 
+        {
+            // code 
+        };
+```
+
+
 ### Thread Affinity - 线程关联性
-是指在多线程编程中，某些操作或者资源必须有创建它们的原始线程访问或者修改的特性。
+是指在多线程编程中，某些操作或者资源必须由创建它们的原始线程访问或者修改的特性。
+
+典型的例子，以Windows app开发举例，就是UI更新只能在主线程中更新，当代码直接希望通过分线程更新UI时就会报错。
+避免这样异常发生就要确保`操作或资源`**是在创建它们的原始线程中访问或者修改的。**，或者利用一些机制比如 .Net提供的一些组件具有线程调度的`.Invoke( Action callback)` 方法。
+
+```C#
+        public partial class Form1 : Form
+    {
+        public Form1()
+        {
+            InitializeComponent();
+        }
+
+        private void button1_Click(object sender, EventArgs e)
+        {
+            Thread thread = new Thread(()=>ShowText("Ho~~ Miao Mi",5000));
+            thread.Start();
+        }
+
+        private void button2_Click(object sender, EventArgs e)
+        {
+            Thread thread = new Thread(() => ShowText("Wang wang wangwagn", 2000));
+            thread.Start();
+        }
+
+        void ShowText(string message ,int delay)
+        {
+            Thread.Sleep(delay);
+            // TextLabel.Text = message; 直接这样写是不可以的,因为这个方法是在分线程上调用的,而UI组件是在主线程上创建的
+
+            TextLabel.Invoke(() => TextLabel.Text = message); // 使用有线程调度效果的Invoke将更新代码调度回主线程 
+        }
+    }
+```
 
 ### Thread Synchronization - 线程同步
 是指在`多线程编程`中， **系欸套多个线程对共享资源的访问**，以确保程序运行的正确性、数据一致性，防止`Race  Condition` 和 `DeadLock` 等问题的机制和技术
@@ -42,6 +108,8 @@ CPU 实际调度的是 线程的上下文（CPU 寄存器+程序计数器等）�
 
 ### atomic operation - 原子操作
 是指一个不可中断的执行单元。要么完全执行，要么不执行。必须确保数据的一致性，在操作期间，其他线程无法观察到中间状态（如读取到部分修改的值）。核心就是数据的`读取-修改-写入`过程是连续完成的。
+
+
 
 ## 基础API
 ### Thread静态类
@@ -321,3 +389,169 @@ CPU 实际调度的是 线程的上下文（CPU 寄存器+程序计数器等）�
 
     }
 ```
+
+### ManualResetEvent - 1对多信号控制器
+`ManualResetEvent` 是一个 *1对多* 类型的信号控制器。当它 *信号亮起* 的时候，所有等待线程都可以进入被阻塞的代码区域。并且开发者必须手动调用示例方法 `.Reset()`才能关闭信号，从而实现阻塞效果。
+另外，它是跨进程的版本。 它比较重，性能开销大，时间精准度一般。如果不是跨进程需求，推荐使用`ManualResetEventSlim`。
+
+***无论使用哪个版本都要记得释放资源***
+
+`ManualResetEvent`语法代码示例：
+
+```C#
+    internal class Program
+    {
+        static int CarCount = 0;
+        static void Main(string[] args)
+        {
+            ManualResetEvent mre = new ManualResetEvent(false); // 代表 traffic light控制器,初始化是红灯
+       
+            Console.WriteLine("Traffic is operating......");
+            Console.WriteLine("Now it is Red Light");
+            Console.WriteLine("All need to wait");
+
+      
+            for (int i = 0; i < 10; i++)
+            {
+                Thread thread = new Thread(() => DoWork(mre));
+                thread.Name = $"Car {i}";
+                thread.Start();
+            }
+
+            bool isGreenLight=false;
+            while (true)
+            {
+                if (!isGreenLight)
+                {
+                    Console.ReadKey();  // 通过用户输入来开启绿灯
+                    mre.Set();
+                    isGreenLight = true;
+                }
+                    
+                if(CarCount>=5) // 如果大于5就跳出循环, 让后面的代码模拟变成红灯有新的车在等
+                    break;
+            }
+
+            for (int i = 0; i < 10; i++) // 模拟新来了10辆车
+            {
+                Thread thread = new Thread(() => DoWork(mre));
+                thread.Name = $"Car {10+i}";
+                thread.Start();
+            }
+        }
+
+        static void DoWork(ManualResetEvent mre)
+        {
+            Console.WriteLine($"Working thread {Thread.CurrentThread.Name} is waiting ...");
+            mre.WaitOne();
+            Random r = new Random();
+            Thread.Sleep(1000 * r.Next(2, 7));
+            Console.WriteLine($"Working thread {Thread.CurrentThread.Name} is Passing by ...");
+        
+            
+            CarCount++;  // 记数
+
+            if(CarCount>=5) // 模拟车过去时间到了 要变红灯
+            {
+                mre.Reset();    
+            }
+        }
+    }
+```
+
+#### ManualResetEventSlim - 轻量级进程内跨线程版本
+与`ManualResetEvent`语法基本一致。只是等待信号的方法是 `.Wait()`。
+```C#
+    internal class Program
+    {
+        static int CarCount = 0;
+        static void Main(string[] args)
+        {
+            ManualResetEventSlim mre = new ManualResetEventSlim(false); // 代表 traffic light控制器,初始化是红灯
+
+           
+            Console.WriteLine("Traffic is operating......");
+            Console.WriteLine("Now it is Red Light");
+            Console.WriteLine("All need to wait");
+
+          
+            for (int i = 0; i < 10; i++)
+            {
+                Thread thread = new Thread(() => DoWork(mre));
+                thread.Name = $"Car {i}";
+                thread.Start();
+            }
+
+            bool isGreenLight=false;
+            while (true)
+            {
+                if (!isGreenLight)
+                {
+                    Console.ReadKey();  // 通过用户输入来开启绿灯
+                    mre.Set();
+                    isGreenLight = true;
+                }
+                    
+                if(CarCount>=5) // 如果大于5就跳出循环, 让后面的代码模拟变成红灯有新的车在等
+                    break;
+            }
+
+
+
+            for (int i = 0; i < 10; i++) // 模拟新来了10辆车
+            {
+                Thread thread = new Thread(() => DoWork(mre));
+                thread.Name = $"Car {10+i}";
+                thread.Start();
+            }
+        }
+
+        static void DoWork(ManualResetEventSlim mre)
+        {
+            Console.WriteLine($"Working thread {Thread.CurrentThread.Name} is waiting ...");
+            mre.Wait(); // 如果是这个方法，如果用完后不是放资源相对安全，但是还是建议释放
+            Random r = new Random();
+            Thread.Sleep(1000 * r.Next(2, 7));
+            Console.WriteLine($"Working thread {Thread.CurrentThread.Name} is Passing by ...");
+        
+            
+            CarCount++;  // 记数
+
+            if(CarCount>=5) // 模拟车过去时间到了 要变红灯
+            {
+                mre.Reset();    
+            }
+        }
+    }
+```
+
+### ThreadPool
+
+## MultiThreads Programming debugging
+VS开发环境下，使用debug(F5) 模式运行程序后可以依赖`Threads`窗口和`Parallel Stacks`窗口进行Debug分析。
+这两个窗口可以在`顶部菜单->Debug->Windows`菜单中找到。
+
+1. 两个窗口的核心信息基本上是一致的。`Parallel Stacks`窗口 提供了更多图形化的提示。
+2. 可以在`Threads`窗口 `暂停` 具体某个线程，然后让其他线程继续执行。只需要根据需要点击 `Pause`暂停或 `Thaw`继续运转
+3. 在Debug暂停时，可以使用`immediate window` 输入命令查看相关信息。
+
+## 控制线程等待
+有3中方法：
+```C#
+    Thread.Sleep( milliseconds ); 
+    /// Thread.Sleep的效果是将 `线程挂起`，也改变了`线程的状态`。它把线程从CPU移除一段时间(传入的参数)。 这个方法最节省资源，但是精度略低，在10-15毫秒左右。
+
+    Thread.SpinWait( number of iterations ); 
+    /// Thread.SpinWiat的效果是线程继续霸占CPU核心。让CPU空转n次(传入的参数)，线程状态还是在运行。适合极端时间等待，用于竞争锁的情况下使用。精度极高，纳秒级。 
+    /// SpinWait(1000) 的耗时远远低于 Thread.Sleep(1)，甚至是微秒级。
+
+    SpinWait.SpinUntil( condition CallBack，timeout );
+    /// 更高级一点的线程等待处理方式。与SpinWait一样，先让CPU空转，如果条件表达式成立了，返回 true ，结束等待进入后面的代码。有3个重载版本，不带timeout的就只会依赖条件表达式的结果。带timeout的，如果条件表达式不成立，时间到了也会结束等待，但是返回false 然后执行后面的代码。
+
+```
+
+## 从线程中返回一个结果
+***首先，Thread本身并没有内置的返回一个结果的方法！！***
+如果必须要从工作线程中返回一个结果只能通过操作`共享资源`的方式，在分线程中更新这个资源的值之后，在主线程中使用工作线程的`.join()`方法将线程阻塞，等待线程完成后再让后续代码使用更新后的结果。
+
+但是`Task` 类有内置的返回一个结果的方法。

@@ -5,7 +5,7 @@
         static int CarCount = 0;
         static void Main(string[] args)
         {
-            ManualResetEvent mre = new ManualResetEvent(false); // 代表 traffic light控制器,初始化是红灯
+            ManualResetEventSlim mre = new ManualResetEventSlim(false); // 代表 traffic light控制器,初始化是红灯
 
            
             Console.WriteLine("Traffic is operating......");
@@ -25,7 +25,7 @@
             {
                 if (!isGreenLight)
                 {
-                    Console.ReadKey();
+                    Console.ReadKey();  // 通过用户输入来开启绿灯
                     mre.Set();
                     isGreenLight = true;
                 }
@@ -44,10 +44,10 @@
             }
         }
 
-        static void DoWork(ManualResetEvent mre)
+        static void DoWork(ManualResetEventSlim mre)
         {
             Console.WriteLine($"Working thread {Thread.CurrentThread.Name} is waiting ...");
-            mre.WaitOne();
+            mre.Wait();
             Random r = new Random();
             Thread.Sleep(1000 * r.Next(2, 7));
             Console.WriteLine($"Working thread {Thread.CurrentThread.Name} is Passing by ...");

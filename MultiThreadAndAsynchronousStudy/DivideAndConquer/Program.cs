@@ -14,10 +14,13 @@ namespace DivideAndConquer
             int sum1 = 0, sum2 = 0, sum3 = 0, sum4 = 0;
 
             Thread thread1 = new Thread(() => sum1 = DoSum(Nums, 0, interval));
+            thread1.Name = "Hello";
             Thread thread2 = new Thread(() => sum2 = DoSum(Nums, interval, 2 * interval));
+            thread2.Name = "I AM great";
             Thread thread3 = new Thread(() => sum3 = DoSum(Nums, 2 * interval, 3 * interval));
+            thread3.Name = "King";
             Thread thread4 = new Thread(() => sum4 = DoSum(Nums, 3 * interval, Nums.Length));
-
+            thread4.Name = "Queening";
             List<Thread> threads = new List<Thread>();
             threads.Add(thread1);
             threads.Add(thread2);
@@ -39,6 +42,7 @@ namespace DivideAndConquer
             // 利用Thread 实例的Join()方法阻碍线程,让主线程等待所有分线程完成后在继续执行
             foreach (var thread in threads)
             {
+                
                 thread.Join(); // Join方法的无参签名重载表示等待当前线程执行完成
             }
 
@@ -59,7 +63,7 @@ namespace DivideAndConquer
             {
 
                 sum += nums[i];
-                Thread.Sleep(500);
+                Thread.Sleep(10000);
 
             }
             return sum;
