@@ -526,6 +526,13 @@ CPU 实际调度的是 线程的上下文（CPU 寄存器+程序计数器等）�
 ```
 
 ### ThreadPool
+```C#
+        ThreadPool.QueueUserWorkItem(AA);
+        void AA(object? i) 
+        {
+            // code 
+        };
+```
 
 ## MultiThreads Programming debugging
 VS开发环境下，使用debug(F5) 模式运行程序后可以依赖`Threads`窗口和`Parallel Stacks`窗口进行Debug分析。
@@ -555,3 +562,297 @@ VS开发环境下，使用debug(F5) 模式运行程序后可以依赖`Threads`�
 如果必须要从工作线程中返回一个结果只能通过操作`共享资源`的方式，在分线程中更新这个资源的值之后，在主线程中使用工作线程的`.join()`方法将线程阻塞，等待线程完成后再让后续代码使用更新后的结果。
 
 但是`Task` 类有内置的返回一个结果的方法。
+
+## 如何处理工作线程中的异常Exception
+***在工作线程中出现的异常不会报告在主线线程中***。如果工作线程中出现了异常，从线程角度来讲不会影响主线程，会直接结束工作线程。虽然不会影响主线程，但是会影响工作线程中的任务和它的结果。
+
+```c#
+    internal class Program
+    {
+        static void Main(string[] args)
+        {
+            Thread thread = new Thread(DoWork); // 工作线程的任务
+            thread.Start();
+            thread.Join();
+
+            Console.WriteLine("Program Finished"); 
+        }
+
+        static void DoWork()
+        {
+            // 工作线程中的异常不会报告到主线程中
+            // 处理 exception 的代码要在worker thread中完成
+            try
+            {
+                throw new InvalidOperationException("uh Oh! I am from worker thread");
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e.Message);
+            }
+        }
+    }
+```
+## Asynchronous Programming 异步编程
+### multi threads programming VS asynchronous programming
+**多线程编程**强调同时调用多个线程处理多个任务。可以是将一个任务切片，交由多个线程同时处理从而提高效率；也可能是同时处理不同的任务提高全局效率和cpu利用率。 这取决于程序是如何设计的、
+
+它是基于多个线程的，偏重于处理CPU密集型任务。对于参与任务的线程而言，它是阻塞性的
+
+**异步编程**强调不阻塞性。一个任务没处理完时，程序先去干别的，等这个任务处理完了，程序在回来处理结果。它可以是单线程，也可以是多线程。对于参与任务的线程而言， 它强调不阻塞。
+
+它适合处理IO型任务。
+
+### Task
+
+`Task`的特点：
+1. 默认使用线程池；
+2. 可以返回值；
+3. 可以控制后续流程 - `ContinueWith`
+4. 可以将`Asynchronous/Await`编程写的像Synchronous编程
+
+#### TaskBasic Syntax
+`Task`的使用语法与`Thread`很像：
+
+```C#
+    internal class Program
+    {
+        static void Main(string[] args)
+        {
+            Task task = new Task(DoWorkByTask); // 语法1 只接受同步委托
+            task.Start();
+
+            Console.ReadKey();
+
+            Console.WriteLine();
+            
+            Task.Run(()=> Console.WriteLine("I am written By Task Syntax2")); // 语法2 接受同步委托也接受异步委托
+                                                                              // .Run方法返回一个 Task实例, 如果由后续操作可以操作这个实例
+
+            Console.ReadKey();
+
+        }
+
+        static void DoWorkByTask()
+        {
+            Console.WriteLine("I am used by TASK");
+            Console.WriteLine(Thread.CurrentThread.IsThreadPoolThread); // 证明是线程池的线程
+        }
+    }
+```
+
+#### 利用Task获取返回值
+要多利用`Task`的各种构造函数，支持泛型返回值。
+```C#
+    internal class Program
+    {
+        static void Main(string[] args)
+        {
+            int[] numbers = { 1, 2, 3 ,4,5,6,7,8,9,10};
+
+            int totalParts = 4;
+
+            int interval = numbers.Length/totalParts;
+
+            var t1 = Task.Run(()=>DoSum(numbers,0,interval));
+            var t2 = Task.Run(()=>DoSum(numbers, interval, interval*2));
+            var t3 = Task.Run(()=>DoSum(numbers, interval * 2, interval*3));
+            var t4 = Task.Run(()=>DoSum(numbers, interval * 3, numbers.Length));
+
+
+             t1.Wait();
+            t2.Wait();
+            t3.Wait();
+            t4.Wait();
+
+            List<Task<int>> tasks = new List<Task<int>>(); // 展示Task的功能
+            tasks.Add(t1);
+            tasks.Add(t2);
+            tasks.Add(t3);
+            tasks.Add(t4);
+
+            Console.WriteLine(t1.Result+t2.Result+t3.Result+t4.Result); // 结果与下面一行代码一致
+            Console.WriteLine(tasks.Sum(t=>t.Result));// 为了展示Task的更多功能, 在一个集合里也可以使用聚合方法 
+
+            Console.ReadKey();
+        }
+
+        static int DoSum(int[] nums, int Start, int End) {
+            int tempSum = 0;
+
+            for (int i = Start; i < End; i++) { 
+
+                tempSum += nums[i];
+            }
+        
+            return tempSum;
+        }
+    }
+```
+
+### Task API
+
+#### Task.Delay() 
+静态方法，类似 `Thread.Sleep`, 让当前Task延迟若干毫秒。
+
+#### Task.Wait()
+实例方法，等待当前实例的任务完成。阻塞当前线程，直到任务完成。类似`Thread.Join()`。
+
+#### Task.WaitAll()
+静态方法，可以将若干个task实例作为参数传入，然后等待这些参数tasks全部完成后，在执行后续代码。也是阻塞线程。
+
+#### .result 属性
+访问当前task实例的`结果`。
+***需要注意的是： 访问 `result` 属性实际上也是阻塞当前线程，直到`result`被Task处理完并返回***
+
+#### Task.ContinueWith()
+实例方法。传入`自己(当前实例委托)`去执行另一个`委托任务`并返回一个新的`Task`。主要目的是为了**基于当前委托的结果**去执行另一个任务，并且避免等待当前`.Result`属性导致的*阻塞*。
+
+```C#
+        static void Main(string[] args)
+        {
+            // 使用Task.Run 来传入一个异步任务
+            Task<int> task1 = Task.Run(async () =>
+            {
+                int sum = 0;
+                for (int i = 0; i < 10; i++)
+                {
+                    await Task.Delay(1000); // 模拟耗时任务
+                    sum += i;
+                }
+                return sum;
+            });
+
+            task1.ContinueWith(task1 =>
+            {
+                int result = task1.Result;
+                Console.WriteLine($"Task1 result is {result}");
+            });
+
+            while (true)
+            {
+                string input = Console.ReadLine();
+                if (input == "exit")
+                { break; }
+                else
+                {
+                    Console.WriteLine(input);
+                }
+            }
+
+            Console.WriteLine("Program is finished");
+            Console.ReadKey();
+        }
+```
+#### .WhenAll()或.WhenAny()来处理任务集合的后续
+它们都接收一个`Task`集合。
+`.WhenAll` 代表 - 当集合中的所有任务**都**完成之后..
+`.WhenAny` 代表 - 当集合中的**任意一个**任务完成之后..
+
+```C#
+        static void Main(string[] args)
+        {
+            List<Task<int>> taskForWhenAll = new List<Task<int>>(); // 准备个Task列表最后用来测试
+
+
+            for (int i = 0; i < 10; i++)
+            {
+                int a = i;                  // 防止闭包
+                var task = Task.Run(async () =>
+                {                   
+                    await Task.Delay(500);
+                    return a;
+                });
+                taskForWhenAll.Add(task);   // 把任务加到列表中
+            }
+
+            Task.WhenAll(taskForWhenAll)        // 使用WhenAll - 所有任务都完成时在继续做...
+                .ContinueWith(
+                t=>         // 这个t 是WhenAll方法在所有任务都完成时创建的一个返回值为int[] 的Task<int[]> 
+                Console.WriteLine($"The result for when all is {t.Result.Sum()}") // 将返回值的int[]进行聚合运算
+                );
+
+            List<Task<int>> taskForWhenAny = new List<Task<int>>();
+            for (int i = 0; i < 10; i++)
+            {
+                var task = Task.Run(async () =>
+                {
+                   int a = i;
+                    await Task.Delay(500);
+                    
+                    return a;
+                });
+                taskForWhenAll.Add(task);
+
+            }
+
+            Task.WhenAny(taskForWhenAll)    // 使用WhenAny - 任务集合中任何一个任务完成就做...
+                .ContinueWith(
+               t =>         // 这个t 是一个返回值为 Task<int> 的Task,这个返回值代表着最先完成的那个任务
+               Console.WriteLine($"One of the Result is {t.Result.Result}") // 使用返回值任务的返回值！！
+               );
+
+
+            Console.WriteLine("This is the End of The program!"); // 异步证明, 这最后一行代码先打出来了
+
+            Console.ReadKey();
+        }
+```
+
+#### .Unwrap()方法来剥离ConitnueWith的Task<Task<T>>型返回值的外壳
+使用`.Unwrap()`方法可以在使用`ContinueWith`或`Task.Factory.StartNew`等返回`Task`类型值的方法时让代码更优雅。它可以剥去返回值的"外壳"Task，直接让开发者调用作为泛型参数的“结果” Task。
+```C#
+            Task<int> taskOrigin = Task.Run(() => 10);
+
+           var taskWithoutUnWrap = taskOrigin
+                .ContinueWith(task =>               // ContinueWith 返回的是个Task<T>
+            {
+                return Task.Run(() => task.Result * 5); // .Run返回的是个Task
+            }  ); // 不用Unwrap, 所以ContinueWith返回带是Task<Task<int>>
+
+            Console.WriteLine(taskWithoutUnWrap.Result.Result); // 所以这里用的是Task<>的结果泛型参数的Task<int>的结果
+
+            var taskByUnWrap = taskOrigin.ContinueWith(task =>
+            {
+                return Task.Run(() => task.Result * 7);
+            }).Unwrap(); // 使用Unwrap剥离返回值的外层Task仅保留内层泛型 Task<int>
+
+            Console.WriteLine(taskByUnWrap.Result); // 使用Unwrap代码更优雅
+```
+#### .IsFaulted属性
+如果是`true`则该实例task未处理异常任务失败了。是Task的`status`之一。
+
+### 关于Task的异常
+1. Task的异常不会在主线程中暴露出来，也不会阻塞主线程导致崩溃。它会隐藏于产生异常的Task中。
+2. 使用`try...catch`语句将Task相关代码包裹起来不会捕获异常，catch中的代码不会执行。
+3. 异常会存储在发生异常的Task中。
+4. 因为异常存储与Task中，所以如果由多个是可以遍历的。
+5. 使用`.Wait()`或者`.Result`**可以抛出异常**。
+#### 如何遍历Task实例中存储的异常
+```C#
+            ///利用status - IsFaulted检查是否失败了,同时查看是否存储了Exception
+        if(taskOrigin.IsFaulted && taskOrigin.Exception != null)
+        {
+                // 如果确认异常存在则遍历异常
+            foreach (Exception ex in taskOrigin.Exception.InnerExceptions)
+            {
+                Console.WriteLine(ex.Message);
+            }
+        }
+```
+
+#### 使用ContinueWith的时候利用带有 TaskContinuationOptions参数的签名版本
+`.ContinueWith(Action callbackTask, TaskContinuationOptions)` 参数可以选择`TaskContinuationOptions.NotOnFaulted`枚举项，这样可以在调用这个方法的*基任务*上出现异常时不执行作为参数传入的回调任务。
+
+#### 被await修饰的任务出现异常时也会直接抛出异常
+但是如果有多个异常，只会抛出第一个。
+
+### 关于Task Synchronization
+与Thread Synchronization相关技术一致，只需要把Thread实例换成Task实例。
+
+### 关于 Task Cancellation
+使用`CancellationTokenSource`。
+**另外如果是自己主动取消的建议使用抛出异常**
+可以直接用token的实例
+`token.ThrowIfCancellationRequested()`
+
