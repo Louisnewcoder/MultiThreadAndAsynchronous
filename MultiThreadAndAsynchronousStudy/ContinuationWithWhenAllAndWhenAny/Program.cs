@@ -4,6 +4,8 @@
     {
         static void Main(string[] args)
         {
+            using CancellationTokenSource cts = new CancellationTokenSource();
+
             List<Task<int>> taskForWhenAll = new List<Task<int>>(); // 准备个Task列表最后用来测试
 
             for (int i = 0; i < 10; i++)

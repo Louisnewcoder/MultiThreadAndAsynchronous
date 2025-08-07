@@ -851,8 +851,334 @@ VS开发环境下，使用debug(F5) 模式运行程序后可以依赖`Threads`�
 与Thread Synchronization相关技术一致，只需要把Thread实例换成Task实例。
 
 ### 关于 Task Cancellation
-使用`CancellationTokenSource`。
+推荐使用`CancellationTokenSource`。
 **另外如果是自己主动取消的建议使用抛出异常**
 可以直接用token的实例
 `token.ThrowIfCancellationRequested()`
 
+```C#
+using System;
+using System.Threading;
+using System.Threading.Tasks;
+
+class Program
+{
+    static void Main()
+    {
+        using (CancellationTokenSource cts = new CancellationTokenSource())
+        {
+            Console.WriteLine("开始上传文件... 输入 'cancel' 终止上传。");
+
+            Task uploadTask = Task.Run(() => UploadFile(cts.Token), cts.Token);
+
+            // 主线程监听用户输入
+            while (!uploadTask.IsCompleted)
+            {
+                string? input = Console.ReadLine();
+                if (input == "cancel")
+                {
+                    cts.Cancel(); // 通知任务取消
+                    Console.WriteLine("取消请求已发送！");
+                    break;
+                }
+            }
+
+            try
+            {
+                uploadTask.Wait(); // 等待任务结束
+            }
+            catch (AggregateException ex) when (ex.InnerException is OperationCanceledException)
+            {
+                Console.WriteLine("上传任务被取消了！");
+            }
+
+            Console.WriteLine("主程序结束，资源已清理。");
+        } // 👈 using 块结束，cts 被 Dispose
+    }
+
+    static void UploadFile(CancellationToken token)
+    {
+        try
+        {
+            for (int i = 1; i <= 10; i++)
+            {
+                token.ThrowIfCancellationRequested();
+
+                Console.WriteLine($"上传中...{i * 10}%");
+                Thread.Sleep(500); // 模拟上传延迟
+            }
+
+            Console.WriteLine("文件上传完成！");
+        }
+        catch (OperationCanceledException)
+        {
+            Console.WriteLine("上传过程被用户取消！");
+        }
+    }
+}
+```
+
+**另外，如果是希望通过超时来控制取消，还可以使用`CancellationTokenSource`实例方法的`.CancelAfter( int milliseconds)`方法**
+
+### await 关键字
+1. 在一个方法或一段代码中，当程序运行到 `await`关键字的时候，`calling thread` 会被立即释放。然后所有在`await`关键字后面的内容会被看成是一个 `continuation`,可能在分线程运行，也可能在后台运行。
+2. `await`关键字会返回任务的值，不在需要`task.Result`。
+3. `await`关键字可以抛出异常，返回任务异常集合中的第一个。
+4. `await`关键字会自动管理上下文同步。
+
+### async 和 await 关键字的基础语法
+`async`和`await`是一组固定搭配语法糖。
+**`async`关键字告诉编译器生成状态机、`await`实现把任务挂起，然后等待完成后恢复流程。**
+语法规则：
+1. `await`只能存在于用`async`修饰的方法或lambda表达式中。`await`修饰的一定是**可等待的类型**，如`Task`。**PS:`GetAwaiter()`方法是`Task`类的扩展方法提供的，返回一个`TaskAWater`类型**。
+2. `async`修饰的方法返回值需要是`Task`、`Task<T>`或者`ValueTask`的一种。虽然可以写void返回值类型，但是不推荐，除非是事件处理器，比如：
+```C#
+private async void button1_Click(object sender, EventArgs e)
+{
+    await DoSomethingAsync();
+}
+```
+**PS:`ValueTask` 是轻量级的Task，可以避免堆分配，适合高性能场景**
+
+#### 在不允许定义async的环境下如何使用async/await组合？ 如何void main 和 Unity声明函数中
+用一个以 `async` 修饰的 返回值为 `void`的方法包装一下。
+```C#
+    static void Main(string[] args)
+    {
+        Console.WriteLine("Start program.....");
+        // await DoSomeThingAsync(); // 无法编译
+
+        DoAsWraper(); // 使用一个包装器
+
+        Console.WriteLine("Program finished");
+        Console.ReadKey();
+    }
+
+    static async void DoAsWraper() // 包装器 实际执行 DoSomeThingAsync
+    {
+        Console.WriteLine("I am wrapper");
+        await DoSomeThingAsync();
+        Console.WriteLine("Wrapper finished");
+    }
+
+    static async Task DoSomeThingAsync() //异步方法
+    {
+        Console.WriteLine("Enters in DoSomeThingAsync");
+        await Task.Delay(1000);
+        Console.WriteLine("After DoSomeThingAsync");
+    }
+```
+
+#### 基于async和await的 continuation
+```C#
+public async Task<int> SomeWorkAsync(CancellationToken cancellationToken)
+{
+    var data = await FetchDataAsync(cancellationToken);
+    var processed = await ProcessDataAsync(data, cancellationToken);
+    return await SaveDataAsync(processed, cancellationToken);
+}
+```
+
+
+## Parallel Loops
+用于处理 `divide and conquer` 类型的编程问题。
+
+### Parallel Loops的特点
+**Data Parition**
+默认情况下，编译器会自己决定用多少个线程，然后将目标数据集合分成对应数量的份数。
+
+**主要用线程池的线程，也会创建新的线程**
+
+**编译器会自己认为最合适的决定**
+使用多少线程、用线程池还是创建新的、将数据分成多少份。
+
+**Parallel loops系列方法是阻塞方法**
+
+### 处理Parallel Loops的异常
+1. try-catch要包裹在 `Parallel loops`的外面。
+2. 任何一个线程抛出一场之后，所有线程都不会进入下一个循环。
+3. 新的迭代不会启动（但已运行的迭代会继续执行完）。已启动的迭代可能继续抛出异常。
+4. 所有的线程上的异常都会进入到一个`AggregateException`中。
+5. 在 `Parallel loops`的重载版本中，有可以使用`state`参数的版本。
+```C#
+
+ // 处理Parallel Loops的异常
+ try
+ {
+     Parallel.For(0, numbers.Count, (i, state) =>   // state 代表任意一个线程的状态
+     {
+         if (state.IsExceptional)        // 检查是否有任意一个线程抛出了异常 
+             return;
+
+         lock (_lock)
+         {
+             //  sum += numbers[i];
+             double x = Math.Sqrt(i) * Math.Log(i + 1);
+         }
+     });
+ }
+ catch (AggregateException ex) { 
+ 
+     foreach (Exception inner_ex in ex.InnerExceptions) { Console.WriteLine(inner_ex.Message); }
+ }
+```
+
+### 使用线程状态的Break()和Stop()结束Parallel Loops的迭代
+`分线程state.Break()`和`分线程state.Stop()`两个方法可以用来结束Parallel循环中的迭代。
+`Break()`更温和在尽快结束循环的前提下让已经开始的迭代完成。**适合 需要已完成部分结果 的场景**
+`Stop()`更强制一些，已开始的循环可能完不成。**适合 不需要考虑结果 的场景**
+```C#
+            int[] nums = Enumerable.Range(0, 100).ToArray();
+
+            Parallel.For(0, nums.Length, (i, state) =>   // state 代表任意一个线程的状态
+            {
+
+
+                if (i == 50)        
+                {
+                    state.Stop(); // 尽快结束循环,正在处理中的迭代可能也会结束不会获得结果
+                    Console.WriteLine("I stopped at " + nums[i]); // 可能47,48 也不会处理完,不会迭代51至100
+
+                    state.Break(); // 尽快结束循环, 正在处理中的迭代会完成,可以得到结果
+                    Console.WriteLine("I Broke at " + i);// 如果其他线程正在处理47 48，会处理完,不会迭代51至100
+
+                }
+                Console.WriteLine("I print {0}", nums[i]);
+            });
+```
+### ParallelLoopResult
+`ParallelLoopResult`是Parallel系列循环的返回值。它可以提示开发者循环是否完成以及`LowestBreakIteration`是多少。但是只有在调用`Break()`且没有抛出异常的情况下才会记录`LowestBreakIteration`信息。调用`Stop()`或者抛出异常的话都是`null`。
+
+
+### 在ParallelLoop中使用局部变量处理DivideAndConquer问题
+利用带有 `local Variable`的方法签名版本的循环:
+
+```C#
+// Parallel.For(int fromInclusive, int toExclusive, Func<T localVariable> localVariable, Func<in T,in ParallelLoopState,in TlocalVariable,out TlocalVariable> taskBody, Action<T localVariable> finallyCallBack)
+
+            Parallel.For(0, numbers.Count, () => 0, // 局部变量初始化
+                (i, state, localSum) => localSum + numbers[i],
+                localSum =>
+                    {
+                        lock (_lock)
+                        {
+                            sum += localSum; // 最后合并
+                        }
+                    });
+```
+
+## PLINQ
+### .AsParallel() 方法执行多线程LINQ查询
+
+当要使用`LINQ`查询大规模集合时，使用传统`顺序型集合LINQ查询方式`会产生较长耗时。可以在集合实例上对集合调用`.AsParallel()`方法将集合转换为`可多线程型查询型集合`，利用多线程的效果处理结果。
+
+*ps: 经过自己测试和其他多线程编程效果一样，如果是简单运算，可能还是不如单线程上的顺序循环快！*
+因为PLINQ是将数据自动差分成组之后交给不同线程同时处理，并且每个线程的顺序和效率可能不同，所以返回的结果集合也几乎是乱序的。如果想将结果顺序使用，可以在`AsParallel()`后链接`.AsOrdered()`可以将结果排序。
+
+```C#
+        static void Main(string[] args)
+        {
+            int count = 100;
+            var items = Enumerable.Range(0, count).ToArray();
+
+            // 传统阻塞型查询与遍历
+            // var resultByTraditional  = items.Where( i => i %2==0 );
+            //  foreach (var item in resultByTraditional) { Console.WriteLine(item); }
+  
+
+            // 使用PLINQ遍历
+            //  var resultByPLinq = items.AsParallel().Where(i => i % 2 == 0);
+
+            // 在AsParallel()后链接.AsOrdered()可以将结果排序
+            var resultByPLinq = items.AsParallel().AsOrdered().Where(i => i % 2 == 0); 
+              foreach (var item in resultByPLinq){Console.WriteLine(item);}
+        }
+```
+### 在.AsParallel()查询结果上调用.ForAll()可以执行多线程遍历
+```C#
+            // 基于上面的示例代码
+            resultByPLinq.ForAll(i=>
+            {   
+                Console.WriteLine(i + $" Current Id is {Thread.CurrentThread.ManagedThreadId}"); 
+            });  
+```
+
+### 调整PLINQ查询结果与遍历的Merge/Buffer设置
+使用`.WithMergeOptions()`可以传入参数来控制生产多少内容之后交给**在主线程上**的*消费者，比如迭代器*去使用。
+***如果要手动设置这个参数，就需要使用普通的`foreach`遍历，因为是Merge是为了服务主线程上的“消费者”。而非在多线程结果上调用.ForAll()方法，因为多线程遍历producer和consumer会在同一个线程上***
+本质上就是所谓的`producer-consumer`模式中的`什么时候消费与消费多少的问题`
+有3个常规设置:
+1. Deffault/AutoBuffered:
+行为：每个线程计算一批结果（默认块大小）后，批量传递给消费者。
+优点：平衡了实时性和吞吐量。
+缺点：轻微的内存和延迟开销
+**适合场景： 常规查询**
+```C#
+var result = data.AsParallel()
+    .WithMergeOptions(ParallelMergeOptions.AutoBuffered) // 可省略（默认）
+    .Where(x => x % 2 == 0);
+```
+2. NotBuffered:
+行为：每个线程计算完一个结果后，立即传递给消费者（如 foreach）。
+优点：延迟极低，内存占用最小。
+缺点：频繁的线程同步可能降低吞吐量。
+**适合场景： 流式处理,如实时日志**
+```C#
+var result = data.AsParallel()
+    .WithMergeOptions(ParallelMergeOptions.NotBuffered)
+    .Where(x => x % 2 == 0);
+
+foreach (var item in result) // 结果逐条输出
+{
+    Console.WriteLine(item);
+}
+```
+
+3. FullyBuffered - 全部生产完了之后，再全部消费掉
+行为：所有线程完成计算后，一次性输出全部结果。
+优点：吞吐量最高（适合聚合操作如 Count()、Sum()）。
+缺点：内存占用高，延迟最大。
+**适合场景： 聚合操作如 ToList()、需要严格顺序AsOrdered()**
+
+```C#
+var result = data.AsParallel()
+    .WithMergeOptions(ParallelMergeOptions.FullyBuffered)
+    .Where(x => x % 2 == 0);
+
+// 所有结果计算完成后才会进入 foreach
+foreach (var item in result)
+{
+    Console.WriteLine(item);
+}
+```
+
+### PLINQ如何处理异常
+在`Query`部分不会抛出异常，和`LINQ`一样，只是`Query`部分只是创建了存储方法。只有在使用`Query结果`的时候才会执行`Query`代码。所以try-catch语句应该去包裹**使用Query结果**的代码部分。
+
+### 如何取消PLINQ查询结果的使用
+Step 1 创建`CancellationToken`,然后在PLINQ创建查询的代码部分链接`.WithCancellation()`并将Token作为参数传入。
+Step 2 在使用查询结果的代码部分，调用CancellationToken实例的`.Cancel()`方法。
+
+***要注意： ForAll的特点是“尽力的完全执行”, 而且在使用Parallel系列的方法中因为是多线程，很多线程已经领到了任务。所以即使使用了.Cancel() 可能也还是会执行出很多内容，如果迭代的目标少，可能会都执行出来***
+
+```C#
+        CancellationTokenSource cts = new CancellationTokenSource();
+
+        var resultByPLinq = items.AsParallel().AsOrdered().WithCancellation(cts.Token).Where(i => i % 2 == 0);
+        foreach (var item in resultByPLinq) { Console.WriteLine(item); }
+
+        try
+        {
+                resultByPLinq.ForAll(i =>
+                {
+                    Console.WriteLine(i + $" Current Id is {Thread.CurrentThread.ManagedThreadId}");
+
+                    if (i == 10)
+                        cts.Cancel();
+
+                });
+        }
+        catch (Exception ex) {
+                Console.WriteLine(ex.Message);
+            }
+```
